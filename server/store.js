@@ -11,7 +11,12 @@ const MAX_LICENSE_LENGTH = 40;
 const MAX_OWNER_LENGTH = 40;
 const MAX_NOTE_LENGTH = 200;
 const UNASSIGNED = '未指定';
+const ACTIVE_STATUS = '在用';
+const DEPRECATED_STATUS = '已弃用';
 const STATUSES = ['在用', '待升', '已弃用'];
+// 弃用理由与操作者名字的长度上限，和备注一档，避免数据文件被塞进超长文本
+const MAX_DEPRECATE_REASON_LENGTH = 200;
+const MAX_OPERATOR_LENGTH = 40;
 
 // 初始数据：三个项目、十八条依赖登记。里面故意留了几种情况：
 // 同一个依赖在两个项目里版本不一致、几条没写责任人、一条没写许可、
@@ -37,7 +42,11 @@ function seedData() {
       { id: 'dep-2011', projectId: 'proj-1003', name: 'react', version: '18.2.0', license: 'MIT', owner: '王凯', status: '在用', note: '页面框架', createdAt: '2026-08-28T04:00:00.000Z', updatedAt: '2026-09-16T02:00:00.000Z' },
       { id: 'dep-2012', projectId: 'proj-1003', name: 'axios', version: '1.6.2', license: 'MIT', owner: '王凯', status: '在用', note: '请求封装', createdAt: '2026-08-28T04:02:00.000Z', updatedAt: '2026-09-16T02:02:00.000Z' },
       { id: 'dep-2013', projectId: 'proj-1003', name: 'lodash', version: '4.17.21', license: 'MIT', owner: '', status: '待升', note: '很多地方直接引了整个包', createdAt: '2026-08-29T08:00:00.000Z', updatedAt: '2026-08-18T03:30:00.000Z' },
-      { id: 'dep-2014', projectId: 'proj-1003', name: 'moment', version: '2.29.4', license: 'MIT', owner: '王凯', status: '已弃用', note: '体积太大，计划整体换成 dayjs', createdAt: '2026-08-29T08:05:00.000Z', updatedAt: '2026-09-10T01:00:00.000Z' },
+      { id: 'dep-2014', projectId: 'proj-1003', name: 'moment', version: '2.29.4', license: 'MIT', owner: '王凯', status: '已弃用', note: '体积太大，计划整体换成 dayjs', createdAt: '2026-08-29T08:05:00.000Z', updatedAt: '2026-09-10T01:00:00.000Z',
+        deprecatedReason: '体积太大，计划整体换成 dayjs', deprecatedAt: '2026-09-10T01:00:00.000Z', deprecatedBy: '王凯',
+        lifecycle: [
+          { action: '弃用', at: '2026-09-10T01:00:00.000Z', by: '王凯', reason: '体积太大，计划整体换成 dayjs' },
+        ] },
       { id: 'dep-2015', projectId: 'proj-1003', name: 'dayjs', version: '1.11.10', license: 'MIT', owner: '王凯', status: '在用', note: '替换 moment 后的时间处理', createdAt: '2026-09-10T01:05:00.000Z', updatedAt: '2026-09-10T01:05:00.000Z' },
       { id: 'dep-2016', projectId: 'proj-1003', name: 'typescript', version: '5.2.2', license: 'Apache-2.0', owner: '王凯', status: '在用', note: '编译与类型检查', createdAt: '2026-08-28T04:10:00.000Z', updatedAt: '2026-09-08T07:40:00.000Z' },
       { id: 'dep-2017', projectId: 'proj-1003', name: 'vite', version: '5.0.10', license: 'MIT', owner: '王凯', status: '在用', note: '本地构建', createdAt: '2026-08-28T04:12:00.000Z', updatedAt: '2026-09-08T07:42:00.000Z' },
@@ -59,12 +68,29 @@ function normalizeProject(item, fallbackIndex) {
   };
 }
 
+// 整理一条弃用/恢复痕迹：动作只认弃用与恢复，时间缺失时回落到调用方给的兜底时间
+function normalizeLifecycleItem(item, fallbackTime) {
+  const source = item && typeof item === 'object' ? item : {};
+  const action = source.action === '恢复' ? '恢复' : '弃用';
+  const at = typeof source.at === 'string' && source.at ? source.at : fallbackTime;
+  const by = typeof source.by === 'string' ? source.by.trim().slice(0, MAX_OPERATOR_LENGTH) : '';
+  const reason = typeof source.reason === 'string' ? source.reason.trim().slice(0, MAX_DEPRECATE_REASON_LENGTH) : '';
+  const entry = { action, at, by };
+  // 恢复动作不挂理由，只有弃用才写为什么
+  if (action === '弃用') entry.reason = reason;
+  return entry;
+}
+
 // 把单条依赖登记整理成固定结构，状态不认识的一律按在用处理
 function normalizeDep(item, fallbackIndex) {
   const source = item && typeof item === 'object' ? item : {};
   const createdAt = typeof source.createdAt === 'string' && source.createdAt ? source.createdAt : new Date().toISOString();
   const status = STATUSES.includes(source.status) ? source.status : STATUSES[0];
-  return {
+  const lifecycle = Array.isArray(source.lifecycle)
+    ? source.lifecycle.map((entry) => normalizeLifecycleItem(entry, createdAt))
+    : [];
+
+  const base = {
     id: typeof source.id === 'string' && source.id ? source.id : `dep-restored-${fallbackIndex + 1}`,
     projectId: typeof source.projectId === 'string' ? source.projectId : '',
     name: typeof source.name === 'string' ? source.name.trim() : '',
@@ -75,6 +101,42 @@ function normalizeDep(item, fallbackIndex) {
     note: typeof source.note === 'string' ? source.note : '',
     createdAt,
     updatedAt: typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : createdAt,
+  };
+
+  if (status !== DEPRECATED_STATUS) {
+    // 非弃用状态不保留弃用快照，什么时候弃用过、谁恢复的都去 lifecycle 里看
+    return { ...base, lifecycle };
+  }
+
+  // 已是弃用状态：以最后一条弃用痕迹为准，老数据缺痕迹时从备注与更新时间补一条
+  let deprecatedAt = typeof source.deprecatedAt === 'string' ? source.deprecatedAt : '';
+  let deprecatedBy = typeof source.deprecatedBy === 'string' ? source.deprecatedBy.trim().slice(0, MAX_OPERATOR_LENGTH) : '';
+  let deprecatedReason = typeof source.deprecatedReason === 'string'
+    ? source.deprecatedReason.trim().slice(0, MAX_DEPRECATE_REASON_LENGTH) : '';
+
+  for (let i = lifecycle.length - 1; i >= 0; i -= 1) {
+    if (lifecycle[i].action === '弃用') {
+      if (!deprecatedAt) deprecatedAt = lifecycle[i].at;
+      if (!deprecatedBy) deprecatedBy = lifecycle[i].by;
+      if (!deprecatedReason) deprecatedReason = lifecycle[i].reason;
+      break;
+    }
+  }
+  if (!deprecatedReason) deprecatedReason = base.note.slice(0, MAX_DEPRECATE_REASON_LENGTH);
+  if (!deprecatedAt) deprecatedAt = base.updatedAt;
+
+  const filled = lifecycle.slice();
+  const lastAction = filled.length ? filled[filled.length - 1].action : '';
+  if (lastAction !== '弃用') {
+    filled.push({ action: '弃用', at: deprecatedAt, by: deprecatedBy, reason: deprecatedReason });
+  }
+
+  return {
+    ...base,
+    lifecycle: filled,
+    deprecatedReason,
+    deprecatedAt,
+    deprecatedBy,
   };
 }
 
@@ -137,11 +199,15 @@ module.exports = {
   normalizeProject,
   normalizeDep,
   STATUSES,
+  ACTIVE_STATUS,
+  DEPRECATED_STATUS,
   UNASSIGNED,
   MAX_NAME_LENGTH,
   MAX_VERSION_LENGTH,
   MAX_LICENSE_LENGTH,
   MAX_OWNER_LENGTH,
   MAX_NOTE_LENGTH,
+  MAX_DEPRECATE_REASON_LENGTH,
+  MAX_OPERATOR_LENGTH,
   DATA_FILE,
 };

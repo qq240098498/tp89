@@ -1,11 +1,13 @@
 // 带错误码与出错位置的业务异常，页面据此把问题标到具体输入项上
+// details 用来装额外信息，例如弃用时别的项目里仍在使用同一依赖的清单
 class ApiError extends Error {
-  constructor(status, code, message, field) {
+  constructor(status, code, message, field, details) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.field = field || '';
+    this.details = details && typeof details === 'object' ? details : null;
   }
 }
 

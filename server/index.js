@@ -93,7 +93,13 @@ app.use('/api', (_req, res) => {
 function sendError(res, err) {
   if (err instanceof api.ApiError) {
     return res.status(err.status).json({
-      error: { code: err.code, message: err.message, field: err.field },
+      error: {
+        code: err.code,
+        message: err.message,
+        field: err.field,
+        // 弃用冲突时把别处仍在使用的项目与版本清单一起带给页面，没有附加信息时不带这个键
+        ...(err.details ? { details: err.details } : {}),
+      },
     });
   }
   console.error('[tp89] 处理请求时出现未预期的问题：', err);

@@ -90,6 +90,9 @@
 
       <form class="dep-form hidden" id="dep-form" autocomplete="off">
         <h3 id="dep-form-title">新建登记</h3>
+        <div class="lock-banner hidden" id="dep-lock-banner">
+          这条登记已弃用，版本、许可与责任人已锁定，只能查看；如需修改，请先恢复成在用。
+        </div>
         <div class="form-row">
           <label data-field="projectId">所属项目
             <select id="dep-project"></select>
@@ -105,8 +108,20 @@
           </label>
         </div>
         <label class="full" data-field="note">备注<input id="dep-note" placeholder="为什么用这个版本、有没有待办" maxlength="200"></label>
+
+        <div class="deprecate-box hidden" id="deprecate-box">
+          <label class="full" data-field="deprecateReason">弃用理由（必填）
+            <textarea id="deprecate-reason" rows="2" maxlength="200" placeholder="写清楚为什么弃用这条登记，理由会随弃用记录一起留档"></textarea>
+          </label>
+          <div class="conflicts hidden" id="deprecate-conflicts"></div>
+        </div>
+
+        <div class="usages-box hidden" id="dep-usages"></div>
+        <div class="history hidden" id="dep-history"></div>
+
         <div class="form-actions">
-          <button type="submit">保存</button>
+          <button type="submit" id="dep-submit">保存</button>
+          <button type="button" id="dep-reactivate" class="hidden">恢复成在用</button>
           <button type="button" id="dep-cancel" class="ghost">取消</button>
         </div>
       </form>
