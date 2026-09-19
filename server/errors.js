@@ -1,11 +1,13 @@
 // 带错误码与出错位置的业务异常，页面据此把问题标到具体输入项上
 class ApiError extends Error {
-  constructor(status, code, message, field) {
+  constructor(status, code, message, field, extra) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.field = field || '';
+    // extra 用来放结构化补充信息，例如弃用时的跨项目冲突清单
+    this.extra = extra && typeof extra === 'object' ? extra : null;
   }
 }
 

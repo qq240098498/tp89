@@ -60,6 +60,20 @@ app.post('/api/deps', (req, res) => {
   }
 });
 
+// 弃用前的冲突预检：要排在 /api/deps/:id 前面，否则 check 会被当成某条登记的 id
+app.get('/api/deps/deprecation-check', (req, res) => {
+  try {
+    const result = api.deprecationCheck({
+      depId: api.readQuery(req.query, 'depId'),
+      projectId: api.readQuery(req.query, 'projectId'),
+      name: api.readQuery(req.query, 'name'),
+    });
+    res.json(result);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 app.get('/api/deps/:id', (req, res) => {
   try {
     res.json(api.getDep(req.params.id));
@@ -92,9 +106,10 @@ app.use('/api', (_req, res) => {
 // 统一错误出口：业务异常按状态码与错误码返回，其余按服务异常处理
 function sendError(res, err) {
   if (err instanceof api.ApiError) {
-    return res.status(err.status).json({
-      error: { code: err.code, message: err.message, field: err.field },
-    });
+    const body = { error: { code: err.code, message: err.message, field: err.field } };
+    // 弃用冲突这类错误把结构化清单一并返回，页面直接列项目与版本
+    if (err.extra) body.error.extra = err.extra;
+    return res.status(err.status).json(body);
   }
   console.error('[tp89] 处理请求时出现未预期的问题：', err);
   return res.status(500).json({

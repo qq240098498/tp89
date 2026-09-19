@@ -79,6 +79,7 @@
               <th>责任人</th>
               <th>状态</th>
               <th>备注</th>
+              <th>弃用 / 恢复记录</th>
               <th>更新时间</th>
               <th>操作</th>
             </tr>
@@ -95,16 +96,34 @@
             <select id="dep-project"></select>
           </label>
           <label data-field="depName">依赖名称<input id="dep-name" placeholder="例如 spring-boot" maxlength="60"></label>
-          <label data-field="version">版本<input id="dep-version" placeholder="例如 2.7.18" maxlength="40"></label>
+          <label data-field="version" data-lock-group>版本<input id="dep-version" placeholder="例如 2.7.18" maxlength="40"></label>
         </div>
         <div class="form-row">
-          <label data-field="license">许可<input id="dep-license" placeholder="例如 MIT，还没确认可以留空" maxlength="40"></label>
-          <label data-field="owner">责任人<input id="dep-owner" placeholder="留空表示还没定人" maxlength="40"></label>
+          <label data-field="license" data-lock-group>许可<input id="dep-license" placeholder="例如 MIT，还没确认可以留空" maxlength="40"></label>
+          <label data-field="owner" data-lock-group>责任人<input id="dep-owner" placeholder="留空表示还没定人" maxlength="40"></label>
           <label data-field="status">状态
             <select id="dep-status"></select>
           </label>
         </div>
         <label class="full" data-field="note">备注<input id="dep-note" placeholder="为什么用这个版本、有没有待办" maxlength="200"></label>
+        <div class="deprecate-fields hidden" id="deprecate-fields">
+          <label class="full" data-field="deprecationReason">弃用理由
+            <textarea id="dep-reason" rows="2" maxlength="200" placeholder="写清为什么弃用，例如已停止维护、存在无法升级的安全问题"></textarea>
+          </label>
+          <div class="conflict-box hidden" id="dep-conflict">
+            <div class="conflict-title">这个依赖还在别的项目里被登记为在用或待升：</div>
+            <ul id="dep-conflict-list"></ul>
+            <label class="confirm-line" data-field="confirmDeprecate">
+              <input type="checkbox" id="dep-confirm"> 我已了解这些项目仍在使用，仍要照旧弃用这条登记
+            </label>
+          </div>
+        </div>
+        <div class="dep-tip hidden" id="dep-restore-tip">保存后将恢复为在用，并记录恢复人与恢复时间；恢复之后版本、许可与责任人才能重新修改。</div>
+        <div class="deprecated-info hidden" id="deprecated-info">
+          <div class="lock-tip">这条登记已弃用，版本、许可与责任人只能查看，不能修改；把状态改回“在用”即恢复。</div>
+          <div class="dep-detail" id="deprecated-detail"></div>
+        </div>
+        <div class="history-box hidden" id="dep-history"></div>
         <div class="form-actions">
           <button type="submit">保存</button>
           <button type="button" id="dep-cancel" class="ghost">取消</button>

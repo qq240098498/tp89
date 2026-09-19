@@ -10,6 +10,7 @@ const MAX_VERSION_LENGTH = 40;
 const MAX_LICENSE_LENGTH = 40;
 const MAX_OWNER_LENGTH = 40;
 const MAX_NOTE_LENGTH = 200;
+const MAX_DEPRECATION_REASON_LENGTH = 200;
 const UNASSIGNED = '未指定';
 const STATUSES = ['在用', '待升', '已弃用'];
 
@@ -37,7 +38,7 @@ function seedData() {
       { id: 'dep-2011', projectId: 'proj-1003', name: 'react', version: '18.2.0', license: 'MIT', owner: '王凯', status: '在用', note: '页面框架', createdAt: '2026-08-28T04:00:00.000Z', updatedAt: '2026-09-16T02:00:00.000Z' },
       { id: 'dep-2012', projectId: 'proj-1003', name: 'axios', version: '1.6.2', license: 'MIT', owner: '王凯', status: '在用', note: '请求封装', createdAt: '2026-08-28T04:02:00.000Z', updatedAt: '2026-09-16T02:02:00.000Z' },
       { id: 'dep-2013', projectId: 'proj-1003', name: 'lodash', version: '4.17.21', license: 'MIT', owner: '', status: '待升', note: '很多地方直接引了整个包', createdAt: '2026-08-29T08:00:00.000Z', updatedAt: '2026-08-18T03:30:00.000Z' },
-      { id: 'dep-2014', projectId: 'proj-1003', name: 'moment', version: '2.29.4', license: 'MIT', owner: '王凯', status: '已弃用', note: '体积太大，计划整体换成 dayjs', createdAt: '2026-08-29T08:05:00.000Z', updatedAt: '2026-09-10T01:00:00.000Z' },
+      { id: 'dep-2014', projectId: 'proj-1003', name: 'moment', version: '2.29.4', license: 'MIT', owner: '王凯', status: '已弃用', note: '体积太大，计划整体换成 dayjs', createdAt: '2026-08-29T08:05:00.000Z', updatedAt: '2026-09-10T01:00:00.000Z', deprecationReason: '体积太大，维护停滞，整体换成 dayjs', deprecatedAt: '2026-09-10T01:00:00.000Z', deprecatedBy: '王凯', restoredAt: '', restoredBy: '' },
       { id: 'dep-2015', projectId: 'proj-1003', name: 'dayjs', version: '1.11.10', license: 'MIT', owner: '王凯', status: '在用', note: '替换 moment 后的时间处理', createdAt: '2026-09-10T01:05:00.000Z', updatedAt: '2026-09-10T01:05:00.000Z' },
       { id: 'dep-2016', projectId: 'proj-1003', name: 'typescript', version: '5.2.2', license: 'Apache-2.0', owner: '王凯', status: '在用', note: '编译与类型检查', createdAt: '2026-08-28T04:10:00.000Z', updatedAt: '2026-09-08T07:40:00.000Z' },
       { id: 'dep-2017', projectId: 'proj-1003', name: 'vite', version: '5.0.10', license: 'MIT', owner: '王凯', status: '在用', note: '本地构建', createdAt: '2026-08-28T04:12:00.000Z', updatedAt: '2026-09-08T07:42:00.000Z' },
@@ -63,8 +64,10 @@ function normalizeProject(item, fallbackIndex) {
 function normalizeDep(item, fallbackIndex) {
   const source = item && typeof item === 'object' ? item : {};
   const createdAt = typeof source.createdAt === 'string' && source.createdAt ? source.createdAt : new Date().toISOString();
+  const updatedAt = typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : createdAt;
   const status = STATUSES.includes(source.status) ? source.status : STATUSES[0];
-  return {
+  const textField = (value) => (typeof value === 'string' ? value.trim() : '');
+  const base = {
     id: typeof source.id === 'string' && source.id ? source.id : `dep-restored-${fallbackIndex + 1}`,
     projectId: typeof source.projectId === 'string' ? source.projectId : '',
     name: typeof source.name === 'string' ? source.name.trim() : '',
@@ -74,8 +77,27 @@ function normalizeDep(item, fallbackIndex) {
     status,
     note: typeof source.note === 'string' ? source.note : '',
     createdAt,
-    updatedAt: typeof source.updatedAt === 'string' && source.updatedAt ? source.updatedAt : createdAt,
+    updatedAt,
   };
+
+  if (status === '已弃用') {
+    // 旧数据里已经是弃用状态但没有留痕：用更新时间、责任人与备注补齐，页面上仍能看出时间与人
+    const note = typeof source.note === 'string' ? source.note.trim() : '';
+    base.deprecationReason = textField(source.deprecationReason)
+      || note
+      || '（这条登记在留痕功能上线前就已弃用，没有记录理由）';
+    base.deprecatedAt = textField(source.deprecatedAt) || updatedAt;
+    base.deprecatedBy = textField(source.deprecatedBy) || base.owner;
+    base.restoredAt = textField(source.restoredAt);
+    base.restoredBy = textField(source.restoredBy);
+  } else {
+    base.deprecationReason = textField(source.deprecationReason);
+    base.deprecatedAt = textField(source.deprecatedAt);
+    base.deprecatedBy = textField(source.deprecatedBy);
+    base.restoredAt = textField(source.restoredAt);
+    base.restoredBy = textField(source.restoredBy);
+  }
+  return base;
 }
 
 // 整份数据保证 projects 与 deps 结构一致，指向不存在项目的登记一律丢掉
@@ -143,5 +165,6 @@ module.exports = {
   MAX_LICENSE_LENGTH,
   MAX_OWNER_LENGTH,
   MAX_NOTE_LENGTH,
+  MAX_DEPRECATION_REASON_LENGTH,
   DATA_FILE,
 };
